@@ -4,6 +4,7 @@ module RoversNavigatorHelper
   VALID_INSTRUCTIONS = %w[L R M].freeze
   ROTATE_LEFT_MAPPING = { 'N' => 'W', 'W' => 'S', 'S' => 'E', 'E' => 'N' }.freeze
   ROTATE_RIGHT_MAPPING = { 'N' => 'E', 'E' => 'S', 'S' => 'W', 'W' => 'N' }.freeze
+
   def valid_orientation_set
     VALID_ORIENTATION_REFERENCE
   end
@@ -12,29 +13,16 @@ module RoversNavigatorHelper
     VALID_INSTRUCTIONS
   end
 
-  def rotate_left(orientation)
-    ROTATE_LEFT_MAPPING[orientation]
+  def rotate_left_command(orientation)
+    RotateLeftCommand.new(orientation)
   end
 
-  def rotate_right(orientation)
-    ROTATE_RIGHT_MAPPING[orientation]
+  def rotate_right_command(orientation)
+    RotateRightCommand.new(orientation)
   end
 
-  def move(coordinates, orientation, step = 1)
-    coordinates_ary = coordinates.split(' ')
-    case orientation
-    when 'N'
-      coordinates_ary[1] = (coordinates_ary[1].to_i + step).to_s
-    when 'S'
-      coordinates_ary[1] = (coordinates_ary[1].to_i - step).to_s
-    when 'E'
-      coordinates_ary[0] = (coordinates_ary[0].to_i + step).to_s
-    when 'W'
-      coordinates_ary[0] = (coordinates_ary[0].to_i - step).to_s
-    else
-      raise 'Invalid orientation. Check the input file'
-    end
-    coordinates_ary.join(' ')
+  def move_command(coordinates, orientation)
+    MoveCommand.new(coordinates, orientation)
   end
 
   def start_exploring
@@ -46,14 +34,17 @@ module RoversNavigatorHelper
       instruction_set.split(' ').each do |instruction|
         case instruction
         when 'L'
-          orientation = rotate_left(orientation)
+          command = rotate_left_command(orientation)
         when 'R'
-          orientation = rotate_right(orientation)
+          command = rotate_right_command(orientation)
         when 'M'
-          coordinates = move(coordinates, orientation)
+          command = move_command(coordinates, orientation)
         else
           raise 'Invalid instruction. Check the input file'
         end
+        command.execute
+        coordinates = command.coordinates if command.respond_to?(:coordinates)
+        orientation = command.orientation if command.respond_to?(:orientation)
       end
       puts "#{coordinates} #{orientation}"
     end
@@ -120,11 +111,71 @@ module RoversNavigatorHelper
   end
 end
 
+# Base class for commands
+class Command
+  include RoversNavigatorHelper
+  def execute
+    raise NotImplementedError, "#{self.class} must implement the 'execute' method"
+  end
+end
+
+# Command to rotate left
+class RotateLeftCommand < Command
+  attr_reader :orientation
+
+  def initialize(orientation)
+    @orientation = orientation
+  end
+
+  def execute
+    @orientation = ROTATE_LEFT_MAPPING[orientation]
+  end
+end
+
+# Command to rotate right
+class RotateRightCommand < Command
+  attr_reader :orientation
+
+  def initialize(orientation)
+    @orientation = orientation
+  end
+
+  def execute
+    @orientation = ROTATE_RIGHT_MAPPING[orientation]
+  end
+end
+
+# Command to move
+class MoveCommand < Command
+  attr_reader :coordinates, :orientation
+
+  def initialize(coordinates, orientation)
+    @coordinates = coordinates
+    @orientation = orientation
+  end
+
+  def execute
+    coordinates_ary = coordinates.split(' ')
+    case orientation
+    when 'N'
+      coordinates_ary[1] = (coordinates_ary[1].to_i + 1).to_s
+    when 'S'
+      coordinates_ary[1] = (coordinates_ary[1].to_i - 1).to_s
+    when 'E'
+      coordinates_ary[0] = (coordinates_ary[0].to_i + 1).to_s
+    when 'W'
+      coordinates_ary[0] = (coordinates_ary[0].to_i - 1).to_s
+    else
+      raise 'Invalid orientation. Check the input file'
+    end
+    @coordinates = coordinates_ary.join(' ')
+  end
+end
+
 # This class contains the main logic of the program.
 # You can customize the valid orientation reference set and
 # the valid instructions set by overriding the module's methods and constants
 class RoverExplorer
-  VALID_ORIENTATION_REFERENCE = %w[N S E W].freeze
   include RoversNavigatorHelper
 
   attr_reader :instructions
